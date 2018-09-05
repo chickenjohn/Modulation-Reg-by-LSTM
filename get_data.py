@@ -6,7 +6,7 @@ import time,sys
 
 from requests.auth import HTTPBasicAuth
 from collections import OrderedDict
-from urllib import urlencode
+from urllib.parse import urlencode
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -44,8 +44,8 @@ if not options.password:
    options.password = getpass.getpass('Password:')
 
 # Electrosense API Credentials 
-username=options.username
-password=options.password
+username='tianchu.ji'
+password='cjatelectrosense'
 
 # Electrosense API
 MAIN_URI ='https://test.electrosense.org/api'
@@ -55,23 +55,23 @@ SENSOR_AGGREGATED = MAIN_URI + "/spectrum/aggregated"
 r = requests.get(SENSOR_LIST, auth=HTTPBasicAuth(username, password))
 
 if r.status_code != 200:
-    print r.content
+    print(r.content)
     exit(-1)
 
-slist_json = json.loads(r.content)
+slist_json = json.loads(r.content.decode("utf-8"))
 
 senlist={}
 status=[" (off)", " (on)"]
 
 for i, sensor in enumerate(slist_json):
-    print "[%d] %s (%d) - Sensing: %s" % (i, sensor['name'], sensor['serial'], sensor['sensing'])
+    # print "[%d] %s (%d) - Sensing: %s" % (i, sensor['name'], sensor['serial'], sensor['sensing'])
     senlist[sensor['name']+status[int(sensor['sensing'])]]=i
 
-print ""
-pos = int( raw_input("Please enter the sensor: "))
+print("")
+pos = int(input("Please enter the sensor: "))
 
-print ""
-print "   %s (%d) - %s" % (slist_json[pos]['name'], slist_json[pos]['serial'], slist_json[pos]['sensing'])
+print("")
+print("   %s (%d) - %s" % (slist_json[pos]['name'], slist_json[pos]['serial'], slist_json[pos]['sensing']))
 
 
 # Ask for 5 minutes of aggregatd spectrum data
@@ -92,9 +92,9 @@ def get_spectrum_data (sensor_id, timeBegin, timeEnd, aggFreq, aggTime, minfreq,
 
     
     if r.status_code == 200:
-        return json.loads(r.content)
+        return json.loads(r.content.decode("utf-8"))
     else:
-        print "Response: %d" % (r.status_code)
+        print("Response: %d" % (r.status_code))
         return None
 
 sp1 = None
@@ -125,7 +125,7 @@ else:
 senid = slist_json[pos]['serial'] 
 response = get_spectrum_data (slist_json[pos]['serial'], timeBegin, timeEnd, freqresol, tresol, minfreq, maxfreq)
 data=np.array(response['values'])
-print "Data:",data.shape
+print("Data:", data.shape)
 
 
 
@@ -241,7 +241,7 @@ def savepath():
     if fileName:
         outfile = fileName[0]
         np.save(outfile, saveData)
-        print "File saved:",outfile
+        print("File saved:",outfile)
 
 def updsensor(val):
     global slist_json, senid
@@ -306,7 +306,7 @@ model.load('lstm_tech_classify_gpu.tfl')
 '''
 
 def lnorm(X_train):
-    print "Pad:", X_train.shape
+    print("Pad:", X_train.shape)
     for i in range(X_train.shape[0]):
         X_train[i,:] = X_train[i,:]/la.norm(X_train[i,:],2)
     return X_train
@@ -344,10 +344,10 @@ def fetch():
         hist.setLevels(data.min(), data.max())
         img.setImage(data)
         hist.setImageItem(img)
-        print "Data fetched"
+        print("Data fetched")
         updatePlot()
     except Exception as e:
-        print str(e) 
+        print(str(e))
 
 
 #classif.clicked.connect(classify)
@@ -358,7 +358,7 @@ def updatePlot():
     global img, roi, data, p2, saveData, minfreq, freqresol,text
     selected = roi.getArrayRegion(data, img)
     saveData = selected
-    print "Selected shape:", np.shape(selected)
+    print("Selected shape:", np.shape(selected))
     startfreq= minfreq+int(roi.pos()[0]*freqresol)
     stopfreq= startfreq+int(selected.shape[1]*freqresol)
     x = np.arange(startfreq,stopfreq,freqresol)
