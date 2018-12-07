@@ -5,8 +5,9 @@ from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import sys
 import operator
-import cPickle
+import _pickle as cPickle
 from numpy import linalg as la 
+from collections import Counter
 
 maxlen = 128 
 snrs=""
@@ -15,11 +16,11 @@ test_idx=""
 lbl =""
 def gendata(fp, nsamples):
     global snrs, mods, test_idx, lbl
-    Xd = cPickle.load(open(fp,'rb'))
+    Xd = cPickle.load(open(fp,'rb'), encoding="latin")
     snrs,mods = map(lambda j: sorted(list(set(map(lambda x: x[j], Xd.keys())))), [1,0])
     X = []  
     lbl = []
-    print mods, snrs
+    print(mods, snrs)
     for mod in mods:
         for snr in snrs:
             X.append(Xd[(mod,snr)])
@@ -35,8 +36,9 @@ def gendata(fp, nsamples):
     X_train = X[train_idx]
     X_test =  X[test_idx]
     def to_onehot(yy):
-        yy1 = np.zeros([len(yy), max(yy)+1])
-        yy1[np.arange(len(yy)),yy] = 1
+        yylist=list(yy)
+        yy1 = np.zeros([len(yylist), max(yylist)+1])
+        yy1[np.arange(len(yylist)),yylist] = 1
         return yy1
     Y_train = to_onehot(map(lambda x: mods.index(lbl[x][0]), train_idx))
     Y_test = to_onehot(map(lambda x: mods.index(lbl[x][0]), test_idx))
@@ -45,7 +47,7 @@ def gendata(fp, nsamples):
 
 
 def norm_pad_zeros(X_train,nsamples):
-    print "Pad:", X_train.shape
+    print("Pad: ",X_train.shape)
     for i in range(X_train.shape[0]):
         X_train[i,:,0] = X_train[i,:,0]/la.norm(X_train[i,:,0],2)
     return X_train
@@ -88,19 +90,11 @@ xtest1 = xtest1[:,:maxlen,:]
 xtrain1 = norm_pad_zeros(xtrain1,maxlen)
 xtest1 = norm_pad_zeros(xtest1,maxlen)
 
-
 X_train = xtrain1
 X_test = xtest1
 
 Y_train = ytrain1
 Y_test = ytest1
-
-print("--"*50)
-print("Training data:",X_train.shape)
-print("Training labels:",Y_train.shape)
-print("Testing data",X_test.shape)
-print("Testing labels",Y_test.shape)
-print("--"*50)
 
 def getFontColor(value):
     if np.isnan(value):
@@ -135,8 +129,8 @@ def getConfusionMatrixPlot(true_labels, predicted_labels):
     width = len(cm)
     height = len(cm[0])
 
-    for x in xrange(width):
-        for y in xrange(height):
+    for x in range(width):
+        for y in range(height):
             ax.annotate(str(cm[x][y]), xy=(y, x), horizontalalignment='center',
                         verticalalignment='center', color=getFontColor(cm[x][y]))
 
@@ -152,18 +146,18 @@ class MonitorCallback(tflearn.callbacks.Callback):
         self.accuracy = 0.0
 
     def on_epoch_end(self, training_state):
-        print "accuracy2:", training_state.val_acc 
+        print("accuracy2:", training_state.val_acc)
         if self.accuracy<training_state.val_acc:
            self.accuracy = training_state.val_acc 
-           print "Model saved:", self.accuracy 
+           print("Model saved:", self.accuracy)
            self.model.save('lstm_apclaasify_newtf.tfl')
 
 
-network = tflearn.input_data(shape=[None, maxlen, 2],name="inp")
+network = tflearn.input_data(shape=[None, maxlen, 2],name="input")
 network = tflearn.lstm(network, 128, return_seq=True, dynamic=True, dropout=(1, 0.8))
-#network = tf.transpose(tf.stack(network),[1,0,2])
-network = tflearn.lstm(network, 128, dynamic=True, dropout=(0.8,1))
-network = tflearn.fully_connected(network, len(mods), activation='softmax',name="out")
+# network = tf.transpose(tf.stack(network),[1,0,2])
+network = tflearn.lstm(network, 128, dynamic=True, dropout=(0.8,1), return_seq=False)
+network = tflearn.fully_connected(network, len(mods), activation='softmax',name="target")
 network = tflearn.regression(network, optimizer='adam',
                  loss='categorical_crossentropy',
                  learning_rate=0.001)
@@ -172,8 +166,14 @@ model = tflearn.DNN(network,tensorboard_verbose=0)
 monitorCallback = MonitorCallback(model)
 
 Train = True 
+print("--"*50)
+print("Training data:",X_train.shape)
+print("Training labels:",Y_train.shape)
+print("Testing data",X_test.shape)
+print("Testing labels",Y_test.shape)
+print("--"*50)
 if Train:
-    model.fit(X_train, Y_train, n_epoch=80, shuffle=True,show_metric=True, batch_size=400,validation_set=(X_test, Y_test), run_id='radio_lstm', callbacks=monitorCallback)
+    model.fit(X_train, Y_train, n_epoch=80, shuffle=True, show_metric=True, batch_size=400,validation_set=(X_test, Y_test), run_id='radio_lstm', callbacks=monitorCallback)
 else:
     model.load('lstm_apclaasify_newtf.tfl')
 
