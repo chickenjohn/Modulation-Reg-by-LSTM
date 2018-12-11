@@ -9,6 +9,7 @@ import _pickle as cPickle
 from numpy import linalg as la 
 from collections import Counter
 import os
+import pickle
 
 maxlen = 128 
 snrs=""
@@ -31,7 +32,7 @@ def gendata(fp, nsamples):
     
     np.random.seed(2016)
     n_examples = X.shape[0]
-    n_train = int(n_examples * 0.5)
+    n_train = int(n_examples * 0.9)
     train_idx = np.random.choice(range(0,n_examples), size=n_train, replace=False)
     test_idx = list(set(range(0,n_examples))-set(train_idx))
     X_train = X[train_idx]
@@ -97,6 +98,19 @@ X_test = xtest1
 
 Y_train = ytrain1
 Y_test = ytest1
+
+np.save("./testdata/xtest", X_test)
+np.save("./testdata/ytest", Y_test)
+with open("./testdata/test_idx.pkl", "wb") as fp:
+  pickle.dump(test_idx, fp)
+
+with open("./testdata/lbl.pkl", "wb") as fp:
+  pickle.dump(lbl, fp)
+
+ans=input("continue to run lstm? (Y/N):")
+if(ans == 'N'):
+  exit()
+
 
 def getFontColor(value):
     if np.isnan(value):
@@ -176,7 +190,7 @@ with tf.Session() as sess:
     sess.run(init_op)
 
     noOfBatches = int(X_train.shape[0]/batchSize)
-    isTrain = True
+    isTrain = False
 
     accList=[]
     if isTrain:
