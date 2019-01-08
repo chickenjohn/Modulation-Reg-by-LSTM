@@ -1,16 +1,12 @@
 # Repository for LSTM based modulation classifier.
-Paper under review.
+This is a forked repo from [this repo](https://github.com/zeroXzero/modulation_classif), 
+using LSTM to recognize modulation of signals. I migrated it from tflearn to pure tensorflow.
 
-## Prerequisites
+## Pre-request:
+
 Tensorflow
+RML dataset(Downloadable from [here](https://www.deepsig.io/datasets/))
 
-Tflearn
+## Usage
 
-
-## Files
-
-get_data.py             -- Script for retrieving data from Electrosense
-
-magfft_lstm_classify.py -- Magnitude FFT based classification
-
-rml_lstm_classify.py    -- Amplitude-phase classification model
+    python rml_lstm_classify_tf.py
