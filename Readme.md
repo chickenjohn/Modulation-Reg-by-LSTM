@@ -4,8 +4,9 @@ using LSTM to recognize modulation of signals. I migrated it from tflearn to pur
 
 ## Pre-request:
 
-Tensorflow
-RML dataset(Downloadable from [here](https://www.deepsig.io/datasets/))
+* Python 3
+* Tensorflow
+* RML dataset(Downloadable from [here](https://www.deepsig.io/datasets/))
 
 ## Usage
 
