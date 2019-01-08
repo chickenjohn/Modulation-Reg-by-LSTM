@@ -32,7 +32,7 @@ def gendata(fp, nsamples):
     
     np.random.seed(2016)
     n_examples = X.shape[0]
-    n_train = int(n_examples * 0.9)
+    n_train = int(n_examples * 0.5)
     train_idx = np.random.choice(range(0,n_examples), size=n_train, replace=False)
     test_idx = list(set(range(0,n_examples))-set(train_idx))
     X_train = X[train_idx]
@@ -205,9 +205,9 @@ with tf.Session() as sess:
             randTestIdx = np.random.choice(range(0,X_test.shape[0]), size=batchSize, replace=False)
             randTestX = X_test[randTestIdx]
             randTestY = Y_test[randTestIdx]
-            correct = sess.run(error,{lstmInputs: randTestX, target: randTestY})
-            print('Epoch {0:2d} acc {1:3.1f}%'.format(i + 1, 100 * correct))
-            accList.append(correct)
+            train_err = sess.run(error,{lstmInputs: randTestX, target: randTestY})
+            print('Epoch {0:2d} err {1:3.1f}%'.format(i + 1, 100 * train_err))
+            accList.append(train_err)
         savePath = saver.save(sess, "./tfmodel/rml_model.ckpt")
         print(accList)
         os.system("pause")
