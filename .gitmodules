@@ -1,0 +1,3 @@
+[submodule "BitRnn"]
+	path = BitRnn
+	url = https://github.com/chickenjohn/bit-rnn.git
