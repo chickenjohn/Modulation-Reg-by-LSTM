@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+from tensorflow.python.framework import tensor_util
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
 import sys
@@ -114,8 +115,8 @@ with open("./testdata/test_idx.pkl", "wb") as fp:
 with open("./testdata/lbl.pkl", "wb") as fp:
     pickle.dump(lbl, fp)
 
-ans = input("continue to run lstm? (Y/N):")
-if(ans == 'N'):
+ans = input("continue to run lstm? (y/n):")
+if(ans == 'n'):
     exit()
 
 
@@ -177,18 +178,18 @@ print("--"*50)
 batchSize = 200
 
 with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
-    lstmInputs = tf.placeholder(tf.int32, [None, maxlen, 2])
-    target = tf.placeholder(tf.int32, [None, len(mods)])
+    lstmInputs = tf.placeholder(tf.float32, [None, maxlen, 2], name="lstm_inputs")
+    target = tf.placeholder(tf.float32, [None, len(mods)])
     # prepare lstm cells
     lstmCell1 = BitLSTMCell(128, w_bit=8, f_bit=8, state_is_tuple=False)
     lstmDropout = tf.contrib.rnn.DropoutWrapper(
         lstmCell1, input_keep_prob=1, output_keep_prob=0.8)
     lstmCell2 = BitLSTMCell(128, w_bit=8, f_bit=8, state_is_tuple=False)
-    stackedLstm = tf.contrib.rnn.MultiRNNCell([lstmDropout, lstmCell2])
+    stackedLstm = tf.contrib.rnn.MultiRNNCell([lstmDropout, lstmCell2], state_is_tuple=False)
     # quantize inputs and zero init states
     lstmInputs = bit_utils.round_bit(lstmInputs, bit=8)
     init_zerostate = bit_utils.round_bit(
-        lstmCell1.zero_state(batchSize, tf.float32), bit=8)
+        stackedLstm.zero_state(batchSize, tf.float32), bit=8)
     # prepare dynamic_rnn
     lstmOutputs, state = tf.nn.dynamic_rnn(
         cell=stackedLstm, inputs=lstmInputs, initial_state=init_zerostate)
@@ -198,8 +199,8 @@ with tf.variable_scope("model", reuse=tf.AUTO_REUSE):
             lambda x: bit_utils.quantize_w(x, bit=8)):
         softmax_w = tf.get_variable("softmax_w", [128, len(mods)])
     softmax_b = tf.get_variable("softmax_b", [len(mods)])
-    predictions = tf.contrib.layers.softmax(
-        tf.add(tf.tensordot(lstmOutputs[:, -1], softmax_w, [[1], [0]]), softmax_b))
+    predictions = tf.nn.softmax(
+        tf.add(tf.tensordot(lstmOutputs[:, -1], softmax_w, [[1], [0]]), softmax_b), name="predictions")
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(
         labels=target, logits=predictions, name="xEntropy")
     mistakes = tf.not_equal(tf.argmax(target, 1), tf.argmax(predictions, 1))
@@ -214,7 +215,7 @@ with tf.Session() as sess:
     sess.run(init_op)
 
     noOfBatches = int(X_train.shape[0]/batchSize)
-    isTrain = True
+    isTrain = False
 
     accList = []
     if isTrain:
@@ -242,12 +243,35 @@ with tf.Session() as sess:
     else:
         saver.restore(sess, "./tf_quantmodel/rml_model.ckpt")
 
+    lstm_cell_weights = [np.empty([130, 512]), np.empty([256, 512])]
+    lstm_cell_biases = [np.empty([512]), np.empty([512])]
+
+    variables_names = [v.name for v in tf.trainable_variables()]
+    values = sess.run(variables_names)
+    for curr_lstm_var_name, curr_var_value in zip(variables_names, values):
+        if curr_lstm_var_name.split('/')[1] == 'rnn':
+            curr_var_lstm_idx = int(curr_lstm_var_name.split('/')[3].split('_')[-1])
+            print(curr_lstm_var_name, curr_var_value.shape)
+            curr_var_name = curr_lstm_var_name.split('/')[-1].split(':')[0]
+            print(curr_var_name, curr_var_lstm_idx)
+            if(curr_var_name == 'kernel' or curr_var_name == 'bias'):
+                lstm_cell_weights[curr_var_lstm_idx] = \
+                    curr_var_value if curr_var_name == 'kernel' \
+                        else lstm_cell_weights[curr_var_lstm_idx]
+                lstm_cell_biases[curr_var_lstm_idx] = \
+                    curr_var_value if curr_var_name == 'bias' \
+                        else lstm_cell_biases[curr_var_lstm_idx]
+
     classes = mods
     acc = {}
     for snr in snrs:
         test_SNRs = list(map(lambda x: lbl[x][1], test_idx))
         test_X_i = X_test[np.where(np.array(test_SNRs) == snr)]
         test_Y_i = Y_test[np.where(np.array(test_SNRs) == snr)]
+        randIdx =np.random.choice(
+                range(0, test_X_i.shape[0]), size=batchSize, replace=False)
+        test_X_i, test_Y_i = test_X_i[randIdx], test_Y_i[randIdx]
+        print("test X shape", test_X_i.shape)
 
         # estimate classes
         test_Y_i_hat = sess.run(predictions, {lstmInputs: test_X_i})
@@ -272,6 +296,19 @@ with tf.Session() as sess:
         ncor = np.sum(conf) - cor
         print("Overall Accuracy: {0:3.2f}".format(cor / (cor+ncor)))
         acc[snr] = 1.0*cor/(cor+ncor)
+        plt.close()
+
     print(acc)
 
-    sess.close()
+# Make a normed histogram.
+print(lstm_cell_biases[1])
+fig, subfigs = plt.subplots(1, 2)
+# subfigs[0, 0].hist(lstm_cell_weights[0].flatten(), bins=100, normed=True)
+# subfigs[0, 0].title.set_text('cell 0 weights')
+subfigs[0].hist(lstm_cell_weights[1].flatten(), bins=100, normed=True)
+subfigs[0].title.set_text('cell 1 weights')
+# subfigs[0, 1].hist(lstm_cell_biases[0].flatten(), bins=300, normed=True)
+# subfigs[0, 1].title.set_text('cell 0 biases')
+subfigs[1].hist(lstm_cell_biases[1].flatten(), bins=300, normed=True)
+subfigs[1].title.set_text('cell 1 biases')
+plt.show()

@@ -1,0 +1,2 @@
+model_checkpoint_path: "rml_model.ckpt"
+all_model_checkpoint_paths: "rml_model.ckpt"
